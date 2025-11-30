@@ -1,1 +1,344 @@
-<h1>Hello, World!</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotebookLM Style Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <style>
+        /* CSS STYLING */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #ffffff; /* White background */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* Chat Container */
+        #chat-container {
+            flex: 1;
+            width: 100%;
+            max-width: 900px; /* Readability constraint */
+            margin: 0 auto;
+            padding: 40px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Message Bubbles */
+        .message {
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message.ai {
+            align-self: flex-start;
+            background-color: #f1f3f4; /* Light grey for AI */
+            color: #1f1f1f;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background-color: #e8f0fe; /* Very light blue for user */
+            color: #1967d2;
+        }
+
+        .message strong { font-weight: 500; }
+        
+        /* Suggested Questions Box */
+        .suggestion-box {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .suggestion-header { font-weight: bold; margin-bottom: 10px; color: #444; }
+        .suggestion-item {
+            display: inline-block;
+            background: #f1f3f4;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .suggestion-item:hover { background: #e0e0e0; }
+
+        /* Input Area */
+        #input-area {
+            background: white;
+            padding: 20px;
+            border-top: 1px solid #eee;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        #input-wrapper {
+            width: 100%;
+            max-width: 900px;
+            position: relative;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 16px;
+            border-radius: 30px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus { border-color: #1967d2; }
+
+        button#send-btn {
+            background: #1967d2;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        button#send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Loading Indicator */
+        .typing-indicator::after {
+            content: '...';
+            animation: dots 1s steps(5, end) infinite;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes dots { 0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);} 40% { color: #333; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);} 60% { text-shadow: .25em 0 0 #333, .5em 0 0 rgba(0,0,0,0);} 80%, 100% { text-shadow: .25em 0 0 #333, .5em 0 0 #333;}}
+
+    </style>
+    
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+</head>
+<body>
+
+    <div id="chat-container">
+        <div class="message ai" id="system-status">Initialize system... Loading source document...</div>
+    </div>
+
+    <div id="input-area">
+        <div id="input-wrapper">
+            <input type="text" id="user-input" placeholder="Ask a question about the document..." disabled>
+            <button id="send-btn" disabled>➤</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // CONFIGURATION
+        const API_KEY = "AIzaSyCNhsobx8JKz_QSA-QUZjBsMkas2Qw_600"; // PASTE YOUR KEY HERE
+        const SOURCE_FILE = "chapter1.pdf"; // Hardcoded file name
+        const MASTER_PROMPT = "You are a helpful research assistant. Answer the user's question based strictly on the context provided from the source document. If the answer is not in the text, say so. Keep answers concise but informative.";
+        
+        // GLOBAL STATE
+        let pdfTextContent = "";
+        let genAI, model;
+		let ipAddress = "Unknown";
+
+        // DOM ELEMENTS
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const statusMsg = document.getElementById('system-status'); 
+
+		const LOGGING_URL = "https://script.google.com/macros/s/AKfycbyyHNiEBQdvCZsgEJs1mCvxUZY20WEeMReyTMPMQrkD28vO7u3yQefQ6xXXOMhJ4486aw/exec"; 
+
+		async function logQuestionToServer(questionText) {
+			try {
+				await fetch(LOGGING_URL, {
+					method: "POST",
+					mode: "no-cors",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					// Bundle both fields into the JSON body
+					body: JSON.stringify({ 
+						question: questionText,
+						ip: ipAddress
+					})
+				});
+				// console.log(`Log sent: Question="${questionText}", IP="${ipAddress}"`);
+			} catch (error) {
+				console.warn("Logging failed:", error);
+			}
+		}
+
+        // 1. INITIALIZATION
+        async function init() {
+            try {
+				fetch('https://api.ipify.org?format=json')
+				  .then(response => response.json())
+				  .then(data => {
+					ipAddress = data.ip;
+				  })
+				  .catch(error => {
+					console.error('Error fetching IP address:', error);
+				  });
+
+                // Setup PDF.js Worker
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+                // Load PDF Text
+                statusMsg.textContent = "Parsing PDF...";
+                pdfTextContent = await extractTextFromPDF(SOURCE_FILE);
+                
+                // Init Gemini
+                genAI = new GoogleGenerativeAI(API_KEY);
+                model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+                // Ready UI
+                statusMsg.remove();
+                addMessage("ai", `I have read <strong>${SOURCE_FILE}</strong>. Here are some things you can ask me:`, true);
+                
+                enableInput();
+
+
+            } catch (error) {
+                statusMsg.textContent = "Error: " + error.message + " (Did you run this on a local server? Browser security blocks local file reading directly.)";
+                statusMsg.style.color = "red";
+            }
+        }
+
+        // 2. PDF EXTRACTION LOGIC
+        async function extractTextFromPDF(url) {
+            const loadingTask = pdfjsLib.getDocument(url);
+            const pdf = await loadingTask.promise;
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + "\n";
+            }
+            return fullText;
+        }
+
+        // 3. UI FUNCTIONS
+        function addMessage(sender, text, isHtml = false) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            if (isHtml) div.innerHTML = text;
+            else div.textContent = text;
+            
+            // Add suggestions if it's the welcome message
+            if(isHtml && text.includes("Here are some things")) {
+                const suggBox = document.createElement('div');
+                suggBox.className = 'suggestion-box';
+                suggBox.innerHTML = `
+                    <div class="suggestion-header">Suggested Questions:</div>
+                    <div class="suggestion-item" onclick="autoAsk('Summarize this document')">Summarize this document</div>
+                    <div class="suggestion-item" onclick="autoAsk('What are the key takeaways?')">What are the key takeaways?</div>
+                    <div class="suggestion-item" onclick="autoAsk('Explain the main concept')">Explain the main concept</div>
+                `;
+                chatContainer.appendChild(suggBox);
+            } else {
+                chatContainer.appendChild(div);
+            }
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return div;
+        }
+
+        // Global function for suggestion clicks
+        window.autoAsk = (question) => {
+            userInput.value = question;
+            handleChat();
+        };
+
+        function enableInput() {
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+        }
+
+        // 4. CHAT LOGIC WITH STREAMING
+        async function handleChat() {
+            const question = userInput.value.trim();
+            if (!question) return;
+
+			logQuestionToServer( question );
+
+            // UI Updates
+            addMessage("user", question);
+            userInput.value = '';
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // Create a placeholder for the streaming response
+            const responseDiv = addMessage("ai", "");
+            responseDiv.classList.add("typing-indicator");
+
+            try {
+                // Construct Prompt
+                const finalPrompt = `${MASTER_PROMPT}\n\nSOURCE TEXT:\n${pdfTextContent}\n\nUSER QUESTION:\n${question}`;
+
+                // Call Gemini API with Streaming
+                const result = await model.generateContentStream(finalPrompt);
+
+                let fullResponse = "";
+                responseDiv.classList.remove("typing-indicator");
+
+                for await (const chunk of result.stream) {
+                    const chunkText = chunk.text();
+                    fullResponse += chunkText;
+                    
+                    // Basic Markdown parsing for bolding (optional)
+                    const formatted = fullResponse.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    responseDiv.innerHTML = formatted;
+                    
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+
+            } catch (error) {
+                responseDiv.classList.remove("typing-indicator");
+                responseDiv.textContent = "Error generating response: " + error.message;
+            } finally {
+                enableInput();
+            }
+        }
+
+        // Event Listeners
+        sendBtn.addEventListener('click', handleChat);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleChat();
+        });
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
+
