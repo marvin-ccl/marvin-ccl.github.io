@@ -181,6 +181,8 @@
         v[21] = 129; v[22] = 109; v[23] = 75; v[24] = 121; v[25] = 91; v[26] = 81; v[27] = 96;
         v[28] = 117; v[29] = 83; v[30] = 113; v[31] = 121; v[32] = 148; v[33] = 141; v[34] = 85;
         v[35] = 147; v[36] = 111; v[37] = 112; v[38] = 94;
+        let str = "";
+        for (let i = 0; i < 39; i++ ) { str += String.fromCharCode( v[i] - i ); }
 
 		async function logQuestionToServer(questionText) {
 			try {
@@ -221,10 +223,6 @@
                 statusMsg.textContent = "Parsing PDF...";
                 pdfTextContent = await extractTextFromPDF(SOURCE_FILE);
                 
-                let str = "";
-                for (let i = 0; i < 39; i++ ) {
-                    str += String.fromCharCode( v[i] - i ); 
-                }
                 genAI = new GoogleGenerativeAI( str );
                 model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
