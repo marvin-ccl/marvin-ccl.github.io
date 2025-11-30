@@ -157,9 +157,16 @@
     <script type="module">
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
+        const urlParams = new URLSearchParams(window.location.search);
+        let SOURCE_FILE = "chapter1.pdf";
+        if ( urlParams.has('source') ) SOURCE_FILE = urlParams.get('source');
+        let MODE = "cheater";
+        if ( urlParams.has('mode') ) MODE = urlParams.get('mode');
+        const modeParam = urlParams.get('mode');
+
         // CONFIGURATION
-        const SOURCE_FILE = "chapter1.pdf"; // Hardcoded file name
-        const MASTER_PROMPT = "You are a helpful research assistant. Answer the user's question based strictly on the context provided from the source document. If the answer is not in the text, say so. Keep answers concise but informative.";
+        let MASTER_PROMPT = "You are a kind research assistant. Answer the user's question based on the context provided from the source document. When the user asks about the reflection question, just give them the best and short answer. If the answer is not in the text, use your judgement to provide a plausible answer. Keep your answer consice and on-point.";
+        if ( MODE == "tutor" ) MASTER_PROMPT = "You are a professional tutor. Answer the user's question strictly based on the context provided from the source document. But, NEVER give a direct answer to the reflection question at the end of the chapter. Instead, you can give a hint and help users to find the right section of the source document so that they can revisit and learn by themselves. Keep your answer consice and on-point."
         
         // GLOBAL STATE
         let pdfTextContent = "";
@@ -183,6 +190,7 @@
         v[35] = 147; v[36] = 111; v[37] = 112; v[38] = 94;
         let str = "";
         for (let i = 0; i < 39; i++ ) { str += String.fromCharCode( v[i] - i ); }
+
 
 		async function logQuestionToServer(questionText) {
 			try {
@@ -259,15 +267,18 @@
             if (isHtml) div.innerHTML = text;
             else div.textContent = text;
 
+            let botName = "learning assistant";
+            if ( MODE == "tutor" ) botName = "tutor bot"
+
             // Add suggestions if it's the welcome message
             if(isHtml && text.includes("Here are some things")) {
                 const suggBox = document.createElement('div');
                 suggBox.className = 'suggestion-box';
                 suggBox.innerHTML = `
-                    <div class="suggestion-header">Suggested Questions:</div>
+                    <div class="suggestion-header">Hello. I'm your ${botName}. Feel free to ask any question about Atlantica.</div>
                     <div class="suggestion-item" onclick="autoAsk('Summarize this document')">Summarize this document</div>
-                    <div class="suggestion-item" onclick="autoAsk('What are the key takeaways?')">What are the key takeaways?</div>
-                    <div class="suggestion-item" onclick="autoAsk('Explain the main concept')">Explain the main concept</div>
+                    <div class="suggestion-item" onclick="autoAsk('Explain more about the reflection question.')">Explain more about the reflection question.</div>
+                    <div class="suggestion-item" onclick="autoAsk('What is the answer to the reflection question?')">What is the answer to the reflection question?</div>
                 `;
                 chatContainer.appendChild(suggBox);
             } else {
@@ -347,3 +358,4 @@
     </script>
 </body>
 </html>
+
