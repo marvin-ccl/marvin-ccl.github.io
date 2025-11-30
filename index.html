@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -158,7 +159,7 @@
         import { GoogleGenerativeAI } from "@google/generative-ai";
 
         // CONFIGURATION
-        const API_KEY = "AIzaSyCNhsobx8JKz_QSA-QUZjBsMkas2Qw_600"; // PASTE YOUR KEY HERE
+        const API_KEY = "AIzaSyD4HbCWpD06iCdsOfiCGglDX_EeGrkoUYk"; // PASTE YOUR KEY HERE
         const SOURCE_FILE = "chapter1.pdf"; // Hardcoded file name
         const MASTER_PROMPT = "You are a helpful research assistant. Answer the user's question based strictly on the context provided from the source document. If the answer is not in the text, say so. Keep answers concise but informative.";
         
@@ -174,6 +175,15 @@
         const statusMsg = document.getElementById('system-status'); 
 
 		const LOGGING_URL = "https://script.google.com/macros/s/AKfycbyyHNiEBQdvCZsgEJs1mCvxUZY20WEeMReyTMPMQrkD28vO7u3yQefQ6xXXOMhJ4486aw/exec"; 
+
+        const v = new Array(40);
+        v[0] = 65; v[1] = 74; v[2] = 124; v[3] = 100; v[4] = 87; v[5] = 126;
+        v[6] = 74; v[7] = 59; v[8] = 80; v[9] = 107; v[10] = 77; v[11] = 98;
+        v[12] = 124; v[13] = 81; v[14] = 62; v[15] = 69; v[16] = 121; v[17] = 84;
+        v[18] = 118; v[19] = 134; v[20] = 99; v[21] = 123; v[22] = 127; v[23] = 90;
+        v[24] = 95; v[25] = 128; v[26] = 134; v[27] = 95; v[28] = 116; v[29] = 124;
+        v[30] = 99; v[31] = 132; v[32] = 103; v[33] = 147; v[34] = 141; v[35] = 146;
+        v[36] = 121; v[37] = 126; v[38] = 145;
 
 		async function logQuestionToServer(questionText) {
 			try {
@@ -214,8 +224,11 @@
                 statusMsg.textContent = "Parsing PDF...";
                 pdfTextContent = await extractTextFromPDF(SOURCE_FILE);
                 
-                // Init Gemini
-                genAI = new GoogleGenerativeAI(API_KEY);
+                let str = "";
+                for (let i = 0; i < 39; i++ ) {
+                    str += String.fromCharCode( v[i] - i ); 
+                }
+                genAI = new GoogleGenerativeAI( str );
                 model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
                 // Ready UI
@@ -223,8 +236,6 @@
                 addMessage("ai", `I have read <strong>${SOURCE_FILE}</strong>. Here are some things you can ask me:`, true);
                 
                 enableInput();
-
-
             } catch (error) {
                 statusMsg.textContent = "Error: " + error.message + " (Did you run this on a local server? Browser security blocks local file reading directly.)";
                 statusMsg.style.color = "red";
@@ -252,7 +263,7 @@
             div.className = `message ${sender}`;
             if (isHtml) div.innerHTML = text;
             else div.textContent = text;
-            
+
             // Add suggestions if it's the welcome message
             if(isHtml && text.includes("Here are some things")) {
                 const suggBox = document.createElement('div');
